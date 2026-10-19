@@ -841,11 +841,11 @@ function exportFile(payload){const blob=new Blob([JSON.stringify(payload,null,2)
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(QS_CONFIG.exportName||'survey')+'_'+R.sid+'.json';
   document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
 function submit(payload){const h={'Content-Type':'application/json'};if(QS_CONFIG.token)h['Authorization']='Bearer '+QS_CONFIG.token;
-  fetch(QS_CONFIG.api,{method:'POST',headers:h,body:JSON.stringify(payload)}).then(r=>{if(!r.ok)queue(payload);}).catch(()=>queue(payload));}
+  fetch("https://ai-resps-api.celin-wang.workers.dev",{method:'POST',headers:h,body:JSON.stringify(payload)}).then(r=>{if(!r.ok)queue(payload);}).catch(()=>queue(payload));}
 function queue(payload){try{const q=JSON.parse(localStorage.getItem('aisurvey_queue')||'[]');q.push(payload);localStorage.setItem('aisurvey_queue',JSON.stringify(q));}catch(e){}}
 (function retry(){try{const api=QS_CONFIG.api;if(!api)return;const q=JSON.parse(localStorage.getItem('aisurvey_queue')||'[]');if(!q.length)return;
   const h={'Content-Type':'application/json'};if(QS_CONFIG.token)h['Authorization']='Bearer '+QS_CONFIG.token;
-  const rest=[];Promise.all(q.map(p=>fetch(api,{method:'POST',headers:h,body:JSON.stringify(p)}).then(r=>{if(!r.ok)rest.push(p);}).catch(()=>rest.push(p))))
+  const rest=[];Promise.all(q.map(p=>fetch("https://ai-resps-api.celin-wang.workers.dev",{method:'POST',headers:h,body:JSON.stringify(p)}).then(r=>{if(!r.ok)rest.push(p);}).catch(()=>rest.push(p))))
     .then(()=>localStorage.setItem('aisurvey_queue',JSON.stringify(rest)));}catch(e){}})();
 
 /* ================= 启动 ================= */
