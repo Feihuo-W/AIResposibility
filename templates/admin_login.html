@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>后台登录</title>
+<style>
+body{margin:0;background:#12101a;color:#e8e2d4;font:14px/1.6 "Microsoft YaHei",sans-serif;
+  display:flex;align-items:center;justify-content:center;min-height:100vh}
+.login{width:320px;max-width:88vw;background:#1c1826;border:1px solid #3a3350;border-radius:8px;padding:28px;text-align:center}
+h1{font-size:17px;color:#f0b429;margin:0 0 6px}
+p{color:#9a92a8;font-size:12px;margin:0 0 18px}
+input{width:100%;padding:10px;margin-bottom:12px;background:#12101a;border:1px solid #3a3350;
+  color:#e8e2d4;border-radius:4px;font-size:16px;text-align:center;letter-spacing:2px}
+button{width:100%;padding:10px;background:#252032;border:1px solid #3a3350;color:#e8e2d4;
+  border-radius:4px;cursor:pointer;font-size:14px}
+button:hover{border-color:#f0b429;color:#f0b429}
+.err{color:#ef5350;font-size:12px;margin-bottom:10px}
+</style>
+</head>
+<body>
+<form class="login" method="post" action="/admin/login">
+  <h1>问卷后台</h1>
+  <p>请输入管理口令</p>
+  {% if error %}<div class="err">{{ error }}</div>{% endif %}
+  <input type="password" name="pin" placeholder="口令" autofocus>
+  <button type="submit">进入</button>
+</form>
+</body>
+</html>

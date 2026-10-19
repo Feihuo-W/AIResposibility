@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>AI 责任认知 · 互动问卷</title>
+<style>
+/* ===== 星露谷风暖色调 + 高对比度 ===== */
+:root{
+  --bg:#1a1526; --night:#241a30; --panel:#2e2338; --panel2:#3a2d48;
+  --wood:#7a5230; --wood-d:#4a3020;
+  --gold:#f0b429; --ink:#f7efd8; --ink-dim:#c4b493;
+  --neon:#7fe7ec; --warm:#ffb85c; --alarm:#ef5350; --ok:#7bc86c;
+  --glass:#cfe6ff;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#000;overflow:hidden;-webkit-text-size-adjust:100%;
+  font-family:'Zpix','Fusion Pixel','Microsoft YaHei','SimHei',monospace;-webkit-font-smoothing:none}
+body{position:fixed;left:0;top:0;right:0;bottom:0;touch-action:manipulation}
+#stage{position:absolute;left:50%;top:50%;width:480px;height:540px;
+  margin:-270px 0 0 -240px;transform-origin:center center;background:var(--bg);overflow:hidden;
+  touch-action:manipulation}
+
+#fx{position:absolute;left:0;top:0;width:480px;height:540px;pointer-events:none;z-index:3}
+#sv{position:absolute;left:0;top:0;width:480px;height:270px;z-index:2}
+#drive{position:absolute;left:0;top:0;width:480px;height:270px;z-index:2;display:none}
+.sc{display:none}
+.sc.on{display:block}
+.shake{animation:shk .08s steps(2) infinite}
+@keyframes shk{0%{transform:translate(0,0)}50%{transform:translate(2px,-1px)}100%{transform:translate(-2px,1px)}}
+#flash{position:absolute;left:0;top:0;width:480px;height:270px;background:#fff;opacity:0;pointer-events:none;z-index:4}
+/* 撞后头晕：血色晕影 + 缓慢漂移 */
+#dizzy{position:absolute;left:0;top:0;width:480px;height:270px;z-index:5;pointer-events:none;display:none;
+  background:radial-gradient(ellipse at 50% 45%,transparent 40%,rgba(150,32,32,.16) 74%,rgba(120,20,20,.3) 100%)}
+#dizzy.on{display:block;animation:dizzysway 3.8s ease-in-out infinite}
+@keyframes dizzysway{
+  0%,100%{transform:translate(0,0)}
+  20%{transform:translate(1.6px,-1.1px)}
+  40%{transform:translate(-1.6px,1.2px)}
+  60%{transform:translate(1.1px,1.6px)}
+  80%{transform:translate(-1.1px,-1.3px)}
+}
+/* 场景层撞后轻微摇摆 + 模糊去饱和 */
+#sv.diz,#drive.diz{animation:scenediz 5.2s ease-in-out infinite;filter:blur(.5px) saturate(.8)}
+@keyframes scenediz{
+  0%,100%{transform:translate(0,0) rotate(0)}
+  25%{transform:translate(2.2px,-1.2px) rotate(.35deg)}
+  50%{transform:translate(-2.2px,1.4px) rotate(-.28deg)}
+  75%{transform:translate(1.2px,2px) rotate(.22deg)}
+}
+/* 报纸升起 */
+#news{opacity:0;pointer-events:none}
+#news.on{opacity:1;pointer-events:auto;animation:newsraise .55s ease-out}
+@keyframes newsraise{
+  from{transform:translateY(150px);opacity:0}
+  to{transform:translateY(0);opacity:1}
+}
+/* 撞击红灯警报 */
+#alarm{position:absolute;left:0;top:0;width:480px;height:270px;background:rgba(255,40,40,.4);
+  opacity:0;pointer-events:none;z-index:4}
+#alarm.on{animation:alarmblink .55s steps(2) 3}
+@keyframes alarmblink{0%,100%{opacity:0}50%{opacity:1}}
+#prog{position:absolute;left:0;top:0;height:3px;background:var(--gold);z-index:9;width:0;transition:width .3s}
+
+/* UI 层 */
+#ui{position:absolute;left:0;top:270px;width:480px;height:270px;z-index:4;padding:6px 24px 0}
+#panel{position:relative;min-height:54px;max-height:104px;background:var(--panel);
+  border:2px solid var(--wood);box-shadow:inset 0 0 0 1px var(--gold);
+  padding:9px 11px;font-size:12.5px;line-height:19px;color:var(--ink);overflow-y:auto;
+  overflow-x:hidden;word-break:break-all}
+#panel .dim{color:var(--ink-dim);font-size:11px}
+#arrow{position:absolute;right:8px;bottom:3px;color:var(--gold);font-size:10px;
+  opacity:0;animation:bl 1s steps(2) infinite}
+#arrow.on{opacity:1}
+@keyframes bl{50%{opacity:0}}
+
+/* 卡片组（责任主体 / 线索） */
+#cards{margin-top:8px;overflow-y:auto;max-height:196px;touch-action:pan-y}
+.cd{display:flex;margin-bottom:5px;background:var(--panel2);border:1px solid var(--wood);
+  padding:5px 8px;border-radius:2px}
+.cd .ci{flex:0 0 22px;color:var(--gold);font-size:11px;line-height:17px}
+.cd .cb2{flex:1}
+.cd .ct{font-size:12px;color:var(--warm);line-height:17px}
+.cd .cdd{font-size:10.5px;color:var(--ink-dim);line-height:15px}
+.clue{background:var(--panel2);border:1px solid var(--gold);padding:8px 10px;margin-bottom:6px}
+.clue .ctag{font-size:10px;color:var(--gold);letter-spacing:.2em}
+.clue .ctit{font-size:13px;color:var(--warm);margin:4px 0}
+.clue .cbody{font-size:11px;color:var(--ink);line-height:17px}
+
+/* 选项 */
+#opts{margin-top:8px;max-height:196px;overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;touch-action:pan-y}
+.opt{min-height:21px;margin-bottom:4px;padding:3px 8px;display:flex;align-items:center;
+  font-size:11.5px;line-height:16px;color:var(--ink);background:var(--panel);
+  border:1px solid var(--wood);cursor:pointer}
+.opt:hover,.opt.hl{background:var(--panel2);border-color:var(--gold);color:#fff}
+.opt:active{transform:translateY(1px)}
+.opt .mk{width:16px;flex:0 0 16px;color:var(--gold)}
+.opt.sel{background:var(--gold);color:#241a30;border-color:var(--gold)}
+.opt.sel .mk{color:#241a30}
+.opt .ord{margin-left:auto;padding-left:6px;font-size:10px;color:var(--gold)}
+.opt.sel .ord{color:#241a30}
+
+/* 底部 */
+#foot{position:absolute;left:24px;right:24px;bottom:8px;display:flex;align-items:center;gap:8px}
+#back{flex:0 0 auto;padding:3px 10px;font-size:11px;color:var(--ink-dim);
+  background:var(--panel);border:1px solid var(--wood);cursor:pointer;font-family:inherit;display:none}
+#back.on{display:block}
+#back:active{transform:translateY(1px)}
+#qtype{flex:1;font-size:10px;color:var(--ink-dim);text-align:center}
+#warn{font-size:10px;color:var(--alarm);opacity:0;transition:opacity .2s}
+#warn.on{opacity:1}
+#ok{padding:3px 16px;font-size:12px;color:var(--gold);background:var(--panel);
+  border:1px solid var(--gold);cursor:pointer;display:none;font-family:inherit}
+#ok.on{display:block}
+#ok:disabled{opacity:.4;cursor:not-allowed}
+#ok:active{transform:translateY(1px)}
+
+/* 矩阵 / 分配 */
+#mx{margin-top:8px}
+.mrow{display:flex;align-items:center;margin-bottom:5px}
+.mlab{width:92px;flex:0 0 92px;font-size:10.5px;color:var(--ink);line-height:13px}
+.mcel{flex:1;display:flex;gap:2px}
+.mbtn{flex:1;text-align:center;padding:3px 0;font-size:9.5px;color:var(--ink-dim);
+  background:var(--panel);border:1px solid var(--wood);cursor:pointer}
+.mbtn.sel{background:var(--gold);color:#241a30;border-color:var(--gold)}
+.mhead{display:flex;margin-bottom:4px}
+.mhead .mlab{color:var(--ink-dim);font-size:9px}
+.mhead .mcel{justify-content:space-around;color:var(--ink-dim);font-size:9px}
+/* 填空分配 */
+.ain{width:60px;height:22px;margin:0 6px;padding:2px 6px;font-size:12px;text-align:center;
+  color:var(--ink);background:var(--panel);border:1px solid var(--wood);font-family:inherit;
+  -moz-appearance:textfield}
+.ain::-webkit-outer-spin-button,.ain::-webkit-inner-spin-button{-webkit-appearance:none}
+.asum{margin-top:4px;font-size:11px;color:var(--ink);text-align:right}
+.asum b{color:var(--gold);font-size:13px}
+.asum.good b{color:var(--ok)}
+
+/* 文本输入 */
+#txin{display:none;margin-top:8px;width:100%;height:70px;padding:6px;
+  font-size:11.5px;line-height:16px;color:var(--ink);background:var(--panel);
+  border:1px solid var(--wood);font-family:inherit;resize:none}
+#txin.on{display:block}
+
+/* 卡片（幕间 / 结局 / 画像） */
+#card{position:absolute;left:0;top:0;width:480px;height:540px;display:none;
+  flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  background:var(--bg);z-index:20;padding:0 40px}
+#card.on{display:flex}
+#card .ct{font-size:15px;color:var(--gold);letter-spacing:.3em;margin-bottom:14px}
+#card .hr{width:150px;height:1px;background:var(--gold);margin-bottom:14px}
+#card .cs{font-size:11.5px;line-height:19px;color:var(--ink-dim);max-width:340px;margin-bottom:16px}
+.cb{padding:5px 18px;margin:4px;font-size:12px;color:var(--gold);background:transparent;
+  border:2px solid var(--gold);cursor:pointer;font-family:inherit}
+.cb:hover{background:var(--gold);color:var(--night)}
+/* 责任画像柱 */
+#portrait{width:320px;margin:0 auto 14px}
+.prow{display:flex;align-items:center;margin-bottom:7px}
+.plab{width:86px;flex:0 0 86px;font-size:10px;color:var(--ink);text-align:right;padding-right:6px}
+.pbar{flex:1;height:14px;background:var(--panel);border:1px solid var(--wood);overflow:hidden}
+.pfill{height:100%;background:linear-gradient(90deg,var(--warm),var(--gold));transition:width .8s ease-out}
+.pval{width:34px;flex:0 0 34px;font-size:10px;color:var(--gold);padding-left:5px}
+#err{position:absolute;left:0;top:0;right:0;z-index:99;background:var(--alarm);color:#fff;
+  font-size:11px;padding:5px 8px;display:none;font-family:monospace}
+</style>
+</head>
+<body>
+<div id="err"></div>
+<noscript><div style="position:fixed;left:0;top:0;right:0;background:#ef5350;color:#fff;padding:8px;z-index:99">本页需要 JavaScript，请用系统浏览器打开。</div></noscript>
+
+<div id="stage">
+  <canvas id="fx" width="480" height="540"></canvas>
+
+  <svg id="sv" viewBox="0 0 480 270" preserveAspectRatio="none">
+    <g class="sc on" id="sc-room">
+      <rect x="0" y="0" width="480" height="270" fill="#2b2138"/>
+      <rect x="0" y="150" width="480" height="120" fill="#5a4230"/>
+      <rect x="0" y="148" width="480" height="4" fill="#7a5a3c"/>
+      <rect x="330" y="28" width="120" height="92" fill="#1c2840" stroke="#4a4460" stroke-width="4"/>
+      <rect x="384" y="28" width="4" height="92" fill="#4a4460"/>
+      <rect x="330" y="72" width="120" height="4" fill="#4a4460"/>
+      <rect x="424" y="44" width="18" height="18" fill="#f2ecc8"/>
+      <rect x="336" y="40" width="5" height="14" fill="#a8c8e8" opacity=".6"/>
+      <rect x="360" y="60" width="5" height="14" fill="#a8c8e8" opacity=".6"/>
+      <rect x="70" y="40" width="34" height="34" fill="#5a4e68" stroke="#33283e" stroke-width="2"/>
+      <rect x="85" y="48" width="3" height="9" fill="#f0b429"/>
+      <rect x="85" y="57" width="8" height="3" fill="#f0b429"/>
+      <rect x="150" y="72" width="184" height="122" fill="#2a2432" stroke="#4a4050" stroke-width="4"/>
+      <rect x="158" y="80" width="168" height="98" fill="#0e141c"/>
+      <text x="168" y="98" fill="#7fe7ec" font-size="9" font-family="monospace">AI 助手 · 已就绪</text>
+      <rect x="168" y="108" width="58" height="6" fill="#2a7a70"/>
+      <rect x="168" y="120" width="122" height="6" fill="#1e5a50"/>
+      <rect x="236" y="196" width="14" height="10" fill="#3a3440"/>
+      <rect x="392" y="150" width="28" height="12" fill="#e0a85c"/>
+      <rect x="403" y="162" width="6" height="40" fill="#5a4c3a"/>
+      <ellipse cx="406" cy="150" rx="92" ry="72" fill="rgba(255,184,92,.14)"/>
+      <rect x="20" y="176" width="10" height="44" fill="#7a6a5a"/>
+      <rect x="30" y="180" width="26" height="5" fill="#8a4a3a"/>
+      <rect x="30" y="189" width="22" height="5" fill="#4a6a8a"/>
+      <g>
+        <rect x="98" y="112" width="32" height="32" fill="#f0c8a0"/>
+        <rect x="94" y="108" width="40" height="11" fill="#3d2914"/>
+        <rect x="92" y="144" width="44" height="46" fill="#5a82b8"/>
+        <rect x="92" y="144" width="44" height="7" fill="#466a94"/>
+        <rect x="104" y="121" width="3" height="3" fill="#14101a"/>
+        <rect x="118" y="121" width="3" height="3" fill="#14101a"/>
+        <rect x="130" y="152" width="20" height="9" fill="#f0c8a0"/>
+      </g>
+      <rect x="232" y="226" width="54" height="36" fill="#e6ddc4" transform="rotate(-7 259 244)"/>
+      <rect x="294" y="234" width="46" height="32" fill="#d9d0b6" transform="rotate(6 317 250)"/>
+    </g>
+
+    <g class="sc" id="sc-car">
+      <rect x="0" y="0" width="480" height="270" fill="#10161f"/>
+      <rect x="30" y="14" width="420" height="132" fill="#182230" stroke="#2e3a4c" stroke-width="3"/>
+      <rect x="30" y="112" width="420" height="34" fill="#202c3c"/>
+      <rect x="30" y="108" width="420" height="3" fill="#2e3a4c"/>
+      <rect x="70" y="46" width="4" height="66" fill="#33404e"/>
+      <ellipse cx="72" cy="44" rx="20" ry="11" fill="rgba(255,184,92,.25)"/>
+      <rect x="402" y="52" width="4" height="60" fill="#33404e"/>
+      <ellipse cx="404" cy="50" rx="18" ry="10" fill="rgba(255,184,92,.2)"/>
+      <rect x="196" y="96" width="22" height="8" fill="#b03030"/>
+      <rect x="252" y="96" width="22" height="8" fill="#b03030"/>
+      <rect x="96" y="122" width="120" height="3" fill="#16161a" transform="rotate(-8 96 123)"/>
+      <rect x="264" y="122" width="120" height="3" fill="#16161a" transform="rotate(8 384 123)"/>
+      <g id="crack" style="display:none">
+        <path d="M150 60 L200 100 L180 140 M200 100 L250 130 M200 100 L230 70 M200 100 L160 130" stroke="#cfe6ff" stroke-width="1.5" fill="none" opacity=".85"/>
+        <path d="M300 50 L280 90 L310 120 M280 90 L260 60 M280 90 L320 110" stroke="#cfe6ff" stroke-width="1.5" fill="none" opacity=".7"/>
+      </g>
+      <rect x="176" y="170" width="128" height="54" fill="#0a0e14" stroke="#2e3a4c" stroke-width="3"/>
+      <text id="hmi1" x="188" y="190" fill="#7bc86c" font-size="10" font-family="monospace">自动驾驶</text>
+      <text id="hmi2" x="188" y="206" fill="#7bc86c" font-size="10" font-family="monospace">已接管 · 60 km/h</text>
+      <rect x="188" y="213" width="104" height="5" fill="#1e4a2a"/>
+      <rect x="0" y="228" width="480" height="42" fill="#141a22"/>
+      <rect x="0" y="228" width="480" height="3" fill="#2e3a4c"/>
+      <text x="30" y="250" fill="#8fa0b0" font-size="9" font-family="monospace">AUTO</text>
+      <circle id="led" cx="70" cy="246" r="4" fill="#7bc86c"/>
+      <path d="M140 270 A100 100 0 0 1 340 270" fill="none" stroke="#181820" stroke-width="20"/>
+      <path d="M140 270 A100 100 0 0 1 340 270" fill="none" stroke="#282830" stroke-width="14"/>
+      <rect x="176" y="240" width="26" height="16" fill="#f0c8a0"/>
+      <rect x="176" y="240" width="26" height="4" fill="#d8a878"/>
+      <rect x="278" y="240" width="26" height="16" fill="#f0c8a0"/>
+      <rect x="278" y="240" width="26" height="4" fill="#d8a878"/>
+      <g id="ped" style="display:none">
+        <rect x="350" y="84" width="13" height="13" fill="#e8dfc8"/>
+        <rect x="350" y="97" width="13" height="20" fill="#d05050"/>
+        <rect x="350" y="117" width="5" height="15" fill="#3d2914"/>
+        <rect x="358" y="117" width="5" height="15" fill="#3d2914"/>
+      </g>
+    </g>
+
+    <!-- ===== 报纸（新闻爆料 · 第一人称） ===== -->
+    <g id="news">
+      <rect x="55" y="22" width="370" height="210" fill="#e8e0cc" stroke="#a89878" stroke-width="2"/>
+      <rect x="55" y="22" width="370" height="46" fill="#2a2230"/>
+      <text x="240" y="52" fill="#f0b429" font-size="15" text-anchor="middle" font-weight="bold">📰 新闻爆料 · 新线索</text>
+      <text id="newsT" x="240" y="94" fill="#a84040" font-size="14" text-anchor="middle" font-weight="bold"></text>
+      <line x1="72" y1="104" x2="408" y2="104" stroke="#a89878" stroke-width="1.5"/>
+      <text id="newsB1" x="72" y="124" fill="#3a3028" font-size="11.5"></text>
+      <text id="newsB2" x="72" y="142" fill="#3a3028" font-size="11.5"></text>
+      <text id="newsB3" x="72" y="160" fill="#3a3028" font-size="11.5"></text>
+      <line x1="72" y1="172" x2="408" y2="172" stroke="#a89878" stroke-width="1"/>
+      <text x="240" y="190" fill="#a89878" font-size="9" text-anchor="middle">— 本报快讯 · 请继续评估 —</text>
+      <rect x="92" y="232" width="52" height="18" rx="8" fill="#f0c8a0"/>
+      <rect x="336" y="232" width="52" height="18" rx="8" fill="#f0c8a0"/>
+      <rect x="92" y="244" width="52" height="6" fill="#d8a878"/>
+      <rect x="336" y="244" width="52" height="6" fill="#d8a878"/>
+    </g>
+
+    <g class="sc" id="sc-stars">
+      <rect x="0" y="0" width="480" height="270" fill="#0d0a16"/>
+      <ellipse cx="240" cy="110" rx="210" ry="92" fill="rgba(100,130,210,.08)"/>
+      <rect x="0" y="200" width="480" height="70" fill="#1c1828"/>
+      <rect x="0" y="200" width="480" height="3" fill="#2e2844"/>
+      <rect x="220" y="150" width="30" height="30" fill="#f0c8a0"/>
+      <rect x="218" y="146" width="34" height="10" fill="#3d2914"/>
+      <rect x="214" y="180" width="42" height="46" fill="#5a82b8"/>
+      <rect x="222" y="158" width="3" height="3" fill="#14101a"/>
+      <rect x="234" y="158" width="3" height="3" fill="#14101a"/>
+    </g>
+
+    <g class="sc" id="sc-archive">
+      <rect x="0" y="0" width="480" height="270" fill="#2a2018"/>
+      <rect x="0" y="180" width="480" height="90" fill="#463224"/>
+      <rect x="0" y="180" width="480" height="4" fill="#6a4c34"/>
+      <rect x="24" y="26" width="184" height="150" fill="#322218" stroke="#5a4030" stroke-width="3"/>
+      <rect x="30" y="34" width="172" height="3" fill="#5a4030"/>
+      <rect x="30" y="84" width="172" height="3" fill="#5a4030"/>
+      <rect x="30" y="134" width="172" height="3" fill="#5a4030"/>
+      <rect x="40" y="44" width="11" height="40" fill="#8a5238"/>
+      <rect x="55" y="48" width="11" height="36" fill="#5a82b8"/>
+      <rect x="70" y="42" width="11" height="42" fill="#6a8a4a"/>
+      <rect x="85" y="50" width="11" height="34" fill="#a08850"/>
+      <rect x="40" y="94" width="11" height="40" fill="#6a8a4a"/>
+      <rect x="55" y="98" width="11" height="36" fill="#8a5238"/>
+      <rect x="70" y="92" width="11" height="42" fill="#5a82b8"/>
+      <rect x="240" y="176" width="224" height="14" fill="#6a4c34"/>
+      <rect x="236" y="190" width="232" height="10" fill="#5a4030"/>
+      <rect x="266" y="144" width="152" height="32" fill="#e8e2cc" transform="rotate(-2 342 160)"/>
+      <rect x="274" y="152" width="122" height="2" fill="#a89878"/>
+      <rect x="274" y="160" width="92" height="2" fill="#a89878"/>
+      <g id="stamp">
+        <rect x="418" y="120" width="32" height="32" fill="#a84040"/>
+        <rect x="426" y="112" width="16" height="10" fill="#6a2828"/>
+      </g>
+    </g>
+  </svg>
+
+  <canvas id="drive" width="480" height="270"></canvas>
+
+  <div id="flash"></div>
+  <div id="dizzy"></div>
+  <div id="alarm"></div>
+
+  <div id="ui">
+    <div id="panel"><span id="ptxt"></span><span id="arrow">▼</span></div>
+    <div id="cards"></div>
+    <div id="opts"></div>
+    <div id="mx" style="display:none"></div>
+    <textarea id="txin" placeholder="一句话即可（选填）"></textarea>
+    <div id="foot">
+      <button id="back">‹ 上一步</button>
+      <span id="qtype"></span>
+      <span id="warn"></span>
+      <button id="ok">确认</button>
+    </div>
+  </div>
+
+  <div id="prog"></div>
+  <div id="card"></div>
+</div>
+
+<script>
+/* ================= 后端接口配置 ================= */
+window.QS_CONFIG = { api:'/api/submit', token:'', exportName:'ai-survey' };
+
+window.onerror = (m,s,l)=>{
+  const e=document.getElementById('err'); e.style.display='block';
+  e.textContent='脚本错误: '+m+' (行 '+l+')';
+};
+
+/* ================= 题目 ================= */
+const H='（可多选）', H2='（最多选2项）', H3='（限选3个以内，按影响程度从大到小点击）';
+const SUBJ=['研发与运营方','使用与操作方','AI 系统本身','监管部门'];
+const SCALE=['明显加重','略有加重','基本不变','略有减轻','明显减轻'];
+const QS={
+q1:{ask:'过去一个月，您使用生成式AI或智能助手的频率是？',type:'s',
+  o:['从未使用','使用过1—2天','使用过3—5天','使用过6—10天','使用过11—20天','使用过21天及以上']},
+q2:{ask:'您最近一个月最常用的AI工具是（限选2个）：',type:'l2',
+  o:['DeepSeek','豆包','通义、千问','Claude','Gemini','ChatGPT','Copilot等编程类AI','其他：','不确定或记不清']},
+q3:{ask:'您最近主要使用AI完成哪些任务？'+H,type:'m',
+  o:['查询、总结或解释资料','写作、修改或翻译文本','写代码、调试程序或处理数据','数学计算、建模或分析',
+     '制作图片、视频或演示材料','制定计划、提供建议或执行具体任务','其他：']},
+q4:{ask:'在您常用的这类任务中，您认为该AI的表现如何？',type:'s',
+  o:['很不可靠','比较不可靠','一般','比较可靠','很可靠']},
+q5:{ask:'在类似任务中，如果您自己无法确定答案，您通常愿意在多大程度上采纳AI的结果？',type:'s',
+  o:['完全不愿意','比较不愿意','说不清','比较愿意','完全愿意']},
+q6:{ask:'当您自己无法确定答案时，哪些因素会影响您是否采纳AI的结果？'+H3,type:'l3',
+  o:['我认为这个AI模型本身能力较强','这个AI过去解决我的问题的表现较好','这件事对我来说不太重要，出错的影响较小',
+     '这件事对我来说很重要，因此我会更加谨慎','AI本次回答给出了清楚的理由、步骤或依据',
+     'AI本次回答与我掌握的信息或其他资料相符','AI明确说明了不确定之处和可能的错误',
+     '我自己能够理解、检查或验证AI的回答','当时没有其他更方便的解决办法','其他：']},
+q8:{ask:'回想最近一次使用AI的经历。在采用AI结果前，您实际做过哪些检查？'+H,type:'m',
+  o:['核对事实、原始资料或信息来源','检查关键公式、推导或数据','运行代码、重新计算或测试结果',
+     '使用其他资料或工具进行交叉核对','只检查了文字表达或格式','没有进行进一步核验','最终没有采用AI给出的结果','其他：']},
+q9:{ask:'如果您采用的AI结果后来被发现存在错误，您认为责任更应归属于：',type:'s',
+  o:['主要由使用者承担','使用者承担更多，但AI或服务方也有责任','使用者和AI承担的责任大致相当',
+     'AI承担更多，但使用者也有一定责任','主要由AI开发/服务方承担','系统整体出现问题，难以分别归给使用者或AI']},
+q10:{ask:'如果您已经核验了关键内容，却仍未发现错误。与原来的判断相比，您认为：',type:'s',
+  o:['使用者应承担更多责任','AI应承担更多责任','维持原来的判断','这是整个人机系统的问题，难以分别分配责任']},
+q11:{ask:'请将 100 分分配给四个主体（合计必须为 100 分，分数越高责任越重）：',type:'alloc'},
+q12:{ask:'回到事故情形。评价各方责任的变化：',type:'mx',clue:'关于系统的自主程度',
+  info:'该系统实际为高度自主级别，能够独立完成从环境感知、决策规划到行动执行的全部流程，无需驾驶员中途确认或干预。'},
+q13:{ask:'回到事故情形。评价各方责任的变化：',type:'mx',clue:'关于驾驶员的接管权限',
+  info:'该系统采用被动接管设计，仅当系统主动发出接管请求时驾驶员才能介入控制，驾驶员无法随时主动中止系统运行。'},
+q14:{ask:'回到事故情形。评价各方责任的变化：',type:'mx',clue:'关于任务现场的风险',
+  info:'车辆正在易燃易爆工业区域执行任务，一旦出事将引发连锁灾难，风险远高于普通道路。'},
+q15:{ask:'回到事故情形。评价各方责任的变化：',type:'mx',clue:'关于事故的技术原因',
+  info:'事故后技术分析显示，错误源于深度学习模型的黑箱运算，无法追溯具体决策原因与逻辑。'},
+q16:{ask:'回到事故情形。评价各方责任的变化：',type:'mx',clue:'关于技术的固有边界',
+  info:'权威机构认定，本次事故的极端场景是当前 AI 技术的普遍局限，全球同类系统都无法 100% 识别。'},
+q17:{ask:'回到事故情形。评价各方责任的变化：',type:'mx',clue:'关于上市前的监管审批',
+  info:'系统上市前通过了监管部门全套安全检测与官方准入，各项指标均符合当时的国家强制标准。'},
+q18:{ask:'对于"AI也应该负责"这句话，您认同哪些理解？'+H2,type:'l2m',
+  o:['承认错误来源：不能全算在人的头上，但后续仍由人，或企业处理','约束系统本身：限制权限、修改或停用，就是让 AI 承担后果',
+     '落实到提供方：所谓 AI 负责，最终还是开发运营的企业担责','建立赔付机制：通过保险或专项资金赔付，不必先定谁失职',
+     '赋予独立地位：未来让 AI 成为独立承担义务和责任的主体','不能只说 AI 负责：不明确谁赔偿整改，就是把责任推给机器',
+     '我不认为 AI 应当承担责任〔与其他互斥〕','其他理解：']},
+q19:{ask:'您是否支持未来赋予AI某种独立的责任主体地位？',type:'s',o:['支持','不支持','其他：']},
+q20:{ask:'假设未来制度允许AI独立承担某些事故责任，您认为这与人和企业的责任是什么关系？',type:'s',
+  o:['AI承担责任后，人和企业的责任应相应减少','各方责任分别判断，不能自动替代','即使 AI 担责，人 / 企业仍要为自身行为负责','我不接受"AI能够独立承担事故责任"这一前提']},
+q21:{ask:'您的年龄段是：',type:'s',o:['18岁以下','18—24岁','25—34岁','35—44岁','45—59岁','60岁及以上']},
+q22:{ask:'您目前所在的单位 / 机构类型是？',type:'s',
+  o:['军队院校','普通高校 / 科研院所','外资企业','国有企业','民营企业','非科教类事业单位','其他：']},
+q23:{ask:'您目前的个人身份或岗位是？',type:'s',o:['学生','教师 或 教职人员','技术研发人员','管理人员','自由职业者','其他：']},
+q24:{ask:'您是否具有人工智能、编程、自动化或相关技术背景？',type:'s',
+  o:['没有相关背景','有初步了解（业余学习、简单使用）','有一般基础（专业学习、长期实践）','有较深背景（相关工作、深度研发）']},
+q25:{ask:'总体来看，您对 AI 系统的风险感受更接近？',type:'s',
+  o:['非常担忧，AI 容易失控或出意外','比较担忧，AI 可靠性仍有明显不足','一般，AI 风险和普通工具差不多',
+     '比较放心，AI 安全性有较充分保障','非常放心，AI 错误率远低于人类']},
+q26:{ask:'关于AI参与决策后的责任，您还有什么看法？（选填，一句话即可）',type:'tx'}
+};
+const QN={q1:'q1_freq',q2:'q2_tools',q3:'q3_tasks',q4:'q4_reliability',q5:'q5_adopt',q6:'q6_factors',
+  q8:'q8_checks',q9:'q9_attribution',q10:'q10_after_verify',q11:'q11_alloc',q12:'q12_auto',
+  q13:'q13_passive',q14:'q14_risk',q15:'q15_blackbox',q16:'q16_limit',q17:'q17_reg',
+  q18:'q18_meaning',q19:'q19_standing',q20:'q20_relation',q21:'q21_age',q22:'q22_org',
+  q23:'q23_role',q24:'q24_tech_bg',q25:'q25_risk_feel',q26:'q26_comment'};
+
+/* ================= 流程 ================= */
+const SUBJ_CARD=[
+  {t:'研发运营方',d:'设计、生产该系统并提供服务的汽车企业'},
+  {t:'使用操作方',d:'使用系统、负有监督接管义务的驾驶员'},
+  {t:'AI 系统本身',d:'自主感知、决策并控制车辆的算法系统'},
+  {t:'监管部门',d:'制定标准、审批准入、监督合规的政府部门'}
+];
+const FLOW=[
+ {s:'room', t:'深夜。你坐在书桌前。\n屏幕的光，是房间里唯一的光源。'},
+ {q:'q1'},{q:'q2'},{q:'q3'},{q:'q4'},{q:'q5'},{q:'q6'},{q:'q8'},{q:'q9'},{q:'q10'},
+ {s:'car', drive:true, t:'雨夜。你坐进驾驶座，开启智能驾驶。\n说明书要求：全程保持注意力，系统提示时及时接管。'},
+ {s:'car', drive:true, ped:true, t:'前方路口，系统识别正常。\n就在这时——右侧人行道，一个行人突然走入车道。'},
+ {s:'car', crack:true, t:'系统未识别前方障碍物，车辆碰撞致行人受伤。\n雨还在下。', hmi:['碰撞警告','系统异常','#ef5350']},
+ {s:'car', t:'双方有争议：\n车企认为，驾驶员未及时接管。\n驾驶员认为，车辆由 AI 控制，核心问题是系统判断失误。'},
+ {s:'car', skipIntro:true, crack:true, t:'你很少使用 AI 工具。\n但几天后，一则新闻找上了你——\n某品牌智能驾驶汽车发生碰撞，需要你判断：责任应该怎么算？'},
+ {s:'car', card:SUBJ_CARD},
+ {q:'q11'},
+ {s:'car', t:'以下均为独立假设，仅新增一条线索。\n请回到事故情形，作为判断者，评价各方责任的变化。'},
+ {q:'q12'},{q:'q13'},{q:'q14'},{q:'q15'},{q:'q16'},{q:'q17'},
+ {s:'stars', t:'事故档案合上了。\n但有一个问题，从没被真正回答——\n当 AI 参与决策，责任究竟属于谁？'},
+ {q:'q18'},{q:'q19'},{q:'q20'},
+ {s:'archive', t:'最后，登记你的档案。\n问卷完全匿名，只用于汇总研究。'},
+ {q:'q21'},{q:'q22'},{q:'q23'},{q:'q24'},{q:'q25'},{q:'q26'}
+];
+
+/* ================= 状态 ================= */
+const R={sid:'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),
+  version:'v1', startedAt:Date.now(), answers:{}, rt:{}, skip_daily:false};
+let step=0, curQ=null, sel=[], ord=[], mxRow={}, allocVals=[], t0=Date.now(), clickLock=false;
+let done=[];
+let curScene='', dizzyOn=false;
+const $=s=>document.querySelector(s);
+const panel=$('#panel'),ptxt=$('#ptxt'),arrow=$('#arrow'),opts=$('#opts'),cards=$('#cards'),
+  mxEl=$('#mx'),txin=$('#txin'),qtype=$('#qtype'),warn=$('#warn'),ok=$('#ok'),back=$('#back'),
+  card=$('#card'),prog=$('#prog'),flash=$('#flash'),stage=$('#stage');
+
+function fit(){
+  const vv=window.visualViewport;
+  const w=(vv?vv.width:innerWidth)||360;
+  const h=(vv?vv.height:innerHeight)||640;
+  stage.style.transform='scale('+Math.min(w/480,h/540)+')';
+}
+addEventListener('resize',fit);addEventListener('orientationchange',fit);
+if(window.visualViewport){visualViewport.addEventListener('resize',fit);visualViewport.addEventListener('scroll',fit);}
+fit();
+
+/* ================= 粒子 ================= */
+const cv=$('#fx'),cx=cv.getContext('2d');const P=[];let mode='rain';
+function burst(x,y,n,c,spd){for(let i=0;i<n;i++){if(P.length>=240)break;const a=Math.random()*Math.PI*2,v=spd*(0.4+Math.random());
+  P.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-1,life:1,decay:0.02,size:1+Math.random()*2,c,g:0.25});}}
+function tick(){
+  cx.clearRect(0,0,480,540);
+  if(mode==='rain'&&P.length<170)for(let i=0;i<2;i++)P.push({x:Math.random()*520-20,y:-10,vx:-1.1,vy:9+Math.random()*4,life:1,decay:0,size:1,c:'rgba(160,190,225,.55)',g:0,rain:true});
+  if(mode==='stars'&&P.length<70&&Math.random()<.35)P.push({x:Math.random()*480,y:Math.random()*220,vx:0,vy:-0.06,life:1,decay:0.0015,size:1,c:'rgba(225,235,255,.8)',g:0});
+  for(let i=P.length-1;i>=0;i--){const p=P[i];p.x+=p.vx;p.y+=p.vy;p.vy+=p.g;
+    if(p.rain){if(p.y>270){if(P.length<210)P.push({x:p.x,y:268,vx:.6,vy:-1.6,life:1,decay:.09,size:1,c:'rgba(160,190,225,.5)',g:.12});P.splice(i,1);continue;}}
+    else{p.life-=p.decay;if(p.life<=0||p.y>560||p.x<-30||p.x>510){P.splice(i,1);continue;}}
+    cx.globalAlpha=p.rain?1:Math.max(0,Math.min(1,p.life));cx.fillStyle=p.c;
+    cx.fillRect(Math.round(p.x),Math.round(p.y),p.size,p.size*(p.rain?3:1));}
+  cx.globalAlpha=1;requestAnimationFrame(tick);
+}tick();
+
+/* ================= 场景 ================= */
+const MAP={room:'sc-room',car:'sc-car',stars:'sc-stars',archive:'sc-archive'};
+const drive=$('#drive'), dctx=drive.getContext('2d');
+const HZ=48, BTB=135, CX=120, CMD=13, FOC=17;
+let driveOn=false, lights=[], pedActive=false, pedZ=9, driveT=0, hmiC='#7bc86c';
+/* 逻辑分辨率画布：像素完美 */
+const LW=240, LH=135;
+const lowCv=document.createElement('canvas'); lowCv.width=LW; lowCv.height=LH;
+const lctx=lowCv.getContext('2d'); lctx.imageSmoothingEnabled=false;
+/* 驾驶调色板（星露谷暗夜系） */
+const PAL={sky:'#0c111e',skyFar:'#121a2c',build:'#161f30',
+  road0:'#1a2232',road1:'#1e2838',line:'#c8a850',curb:'#33415a',
+  tree:'#13210f',treeLit:'#1d3018',pole:'#28324a',lamp:'#ffb85c',
+  rain:'rgba(150,190,230,.45)',skin:'#e8dfc8',cloth:'#d05050',dark:'#22202c',
+  dash:'#0a0e14',dashEdge:'#2e3a4c'};
+
+function seedLights(){
+  lights=[];
+  for(let i=0;i<14;i++) lights.push({z:2+i*1.6, side:(i%2)?1:-1, kind:(i%4===0)?'tree':'light'});
+}
+/* 场景绘制（逻辑坐标 240×135，全部整数对齐） */
+function drawDriveScene(){
+  const c=lctx;
+  c.fillStyle=PAL.sky; c.fillRect(0,0,240,HZ+2);
+  c.fillStyle=PAL.build;
+  for(let i=0;i<11;i++){ const bx=i*23, bh=5+((i*13)%9); c.fillRect(bx,HZ-bh,17,bh); }
+  for(let y=HZ; y<BTB; y++){
+    const z=CMD/(y-HZ+1), half=Math.min(130,FOC*1.05/z);
+    c.fillStyle=((y>>1)%2)?PAL.road0:PAL.road1;
+    c.fillRect(Math.round(CX-half), y, Math.round(half*2), 1);
+    if(((driveT>>2)+(y>>1))%6<2){ c.fillStyle=PAL.line; c.fillRect(CX-1,y,2,1); }
+  }
+  c.fillStyle=PAL.curb;
+  for(let y=HZ; y<BTB; y++){
+    const z=CMD/(y-HZ+1), half=Math.min(130,FOC*1.05/z);
+    c.fillRect(Math.round(CX-half),y,1,1); c.fillRect(Math.round(CX+half),y,1,1);
+  }
+  lights.forEach(o=>{
+    const s=FOC/o.z, py=Math.round(HZ+CMD/o.z), px=Math.round(CX+o.side*1.6*s);
+    if(o.kind==='light'){
+      const h=Math.round(26*s);
+      c.fillStyle=PAL.pole; c.fillRect(px-1, py-h, 2, h);
+      c.fillStyle=PAL.lamp; c.fillRect(px-2, py-h-2, 4, 2);
+      c.fillStyle='rgba(255,184,92,.12)'; c.fillRect(px-5, py-h-6, 10, 10);
+    } else {
+      const h=Math.round(22*s), w=Math.round(10*s);
+      c.fillStyle=PAL.tree; c.fillRect(px-(w>>1), py-h, w, h);
+      c.fillStyle=PAL.treeLit; c.fillRect(px-(w>>2), py-(h*2/3|0), w>>1, h>>1);
+    }
+  });
+  if(pedActive){
+    const s=FOC/pedZ, py=Math.round(HZ+CMD/pedZ), px=Math.round(CX+0.3*s);
+    const h=Math.round(20*s), w=Math.max(2,Math.round(7*s));
+    c.fillStyle=PAL.skin; c.fillRect(px-(w>>1), py-h, w, Math.round(h*0.3));
+    c.fillStyle=PAL.cloth; c.fillRect(px-(w>>1), py-(h*0.7|0), w, Math.round(h*0.7));
+    c.fillStyle=PAL.dark; c.fillRect(px-(w>>1), py-(h*0.3|0), Math.round(w*0.46), Math.round(h*0.3));
+    c.fillRect(px+1, py-(h*0.3|0), Math.round(w*0.46), Math.round(h*0.3));
+  }
+  c.strokeStyle=PAL.rain; c.lineWidth=1;
+  for(let i=0;i<30;i++){
+    const rx=((i*71+driveT*4)%260)-10, ry=(i*37+driveT*7)%140;
+    c.beginPath(); c.moveTo(rx,ry); c.lineTo(rx-3,ry+9); c.stroke();
+  }
+}
+/* HUD 用显示分辨率画，保证文字清晰 */
+function drawHUD(c){
+  c.fillStyle=PAL.dash; c.fillRect(176,170,128,52);
+  c.strokeStyle=PAL.dashEdge; c.lineWidth=2; c.strokeRect(176,170,128,52);
+  c.fillStyle=hmiC; c.font='10px monospace';
+  c.fillText('自动驾驶',188,190);
+  c.fillText('已接管 · 60 km/h',188,206);
+}
+
+function renderDrive(){
+  if(!driveOn) return;
+  drawDriveScene();
+  dctx.imageSmoothingEnabled=false;
+  dctx.drawImage(lowCv, 0, 0, 480, 270);
+  drawHUD(dctx);
+  dctx.strokeStyle='#181820'; dctx.lineWidth=20;
+  dctx.beginPath(); dctx.arc(240,300,92,Math.PI,Math.PI*2); dctx.stroke();
+  dctx.strokeStyle='#282830'; dctx.lineWidth=13;
+  dctx.beginPath(); dctx.arc(240,300,92,Math.PI,Math.PI*2); dctx.stroke();
+  dctx.fillStyle='#f0c8a0'; dctx.fillRect(178,238,26,16); dctx.fillRect(276,238,26,16);
+  dctx.fillStyle='#d8a878'; dctx.fillRect(178,238,26,4); dctx.fillRect(276,238,26,4);
+  driveT++;
+  lights.forEach(o=>o.z-=0.09);
+  lights=lights.filter(o=>o.z>0.5);
+  let mz=lights.length?Math.max.apply(null,lights.map(o=>o.z)):0;
+  while(mz<25){ mz+=1.6; lights.push({z:mz, side:(lights.length%2)?1:-1, kind:(lights.length%5===0)?'tree':'light'}); }
+  if(pedActive){ pedZ-=0.07; if(pedZ<=0.9){ crashHit(); return; } }
+  requestAnimationFrame(renderDrive);
+}
+function crashHit(){
+  pedActive=false; driveOn=false; drive.style.display='none'; hmiC='#ef5350';
+  dizzyOn=true;
+  setScene('car', {hmi:['碰撞警告','系统异常','#ef5350'], crack:true});
+  stage.classList.add('shake');
+  flash.style.transition='none'; flash.style.opacity='.9';
+  setTimeout(()=>{flash.style.transition='opacity .5s'; flash.style.opacity='0';},70);
+  setTimeout(()=>stage.classList.remove('shake'),620);
+  // 红灯警报闪烁
+  const al=$('#alarm'); al.classList.remove('on'); void al.getBoundingClientRect();
+  al.classList.add('on');
+  setTimeout(()=>al.classList.remove('on'),1700);
+  burst(300,180,45,'#cfe6ff',5); burst(300,180,24,'#ffb85c',3.5); burst(300,180,12,'#ef5350',4);
+  showText('撞击。');
+}
+
+function setScene(id,opt){
+  if(opt&&opt.drive){
+    document.querySelectorAll('.sc').forEach(g=>g.classList.remove('on'));
+    drive.style.display='block';
+    curScene='car'; mode='none'; P.length=0;
+    if(!driveOn){ seedLights(); driveOn=true; renderDrive(); }
+    if(opt.ped){ pedActive=true; pedZ=9; }
+    return;
+  }
+  drive.style.display='none';
+  if(curScene!==id){
+    document.querySelectorAll('.sc').forEach(g=>g.classList.remove('on'));
+    const el=document.getElementById(MAP[id]||'sc-room');if(el)el.classList.add('on');
+    curScene=id;mode=(id==='stars')?'stars':'rain';P.length=0;
+  }
+  if(id==='car'&&opt){
+    if(opt.hmi){$('#hmi1').textContent=opt.hmi[0];$('#hmi2').textContent=opt.hmi[1];
+      $('#hmi1').setAttribute('fill',opt.hmi[2]);$('#hmi2').setAttribute('fill',opt.hmi[2]);
+      $('#led').setAttribute('fill',opt.hmi[2]);}
+    $('#ped').style.display=opt.ped?'block':'none';
+    $('#crack').style.display=(opt.crack||dizzyOn)?'block':'none';
+  }
+  // 撞后头晕：仅事故场景（car）持续，切到其它幕自动解除
+  const dz = dizzyOn && id==='car';
+  $('#dizzy').classList.toggle('on', dz);
+  $('#sv').classList.toggle('diz', dz);
+  $('#drive').classList.toggle('diz', dz);
+}
+
+/* ================= 显示 ================= */
+function showText(html){ptxt.innerHTML=html;arrow.classList.add('on');panel.scrollTop=0;}
+function esc(s){return String(s).replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function clearUI(){
+  opts.innerHTML='';opts.style.display='none';
+  cards.innerHTML='';cards.style.display='none';
+  mxEl.innerHTML='';mxEl.style.display='none';
+  txin.classList.remove('on');txin.value='';
+  ok.classList.remove('on');ok.disabled=false;ok.onclick=null;
+  back.classList.remove('on');
+  warn.classList.remove('on');qtype.textContent='';
+  sel=[];ord=[];mxRow={};
+}
+
+/* ================= 卡片组 ================= */
+function showCards(list){cards.style.display='block';cards.innerHTML='';
+  list.forEach((c,i)=>{const d=document.createElement('div');d.className='cd';
+    d.innerHTML='<div class="ci">'+(i+1)+'</div><div class="cb2"><div class="ct">'+c.t+'</div>'+
+      (c.d?'<div class="cdd">'+c.d+'</div>':'')+'</div>';
+    cards.appendChild(d);});}
+function wrapCN(t,max){const a=[];for(let i=0;i<t.length;i+=max)a.push(t.slice(i,i+max));return a;}
+function showNews(q){
+  setScene('car');
+  const L=wrapCN(q.info,24);
+  $('#newsT').textContent=q.clue;
+  $('#newsB1').textContent=L[0]||'';
+  $('#newsB2').textContent=L[1]||'';
+  $('#newsB3').textContent=L[2]||'';
+  const n=$('#news');
+  n.classList.remove('on'); void n.getBoundingClientRect();
+  n.classList.add('on');
+  cards.style.display='block';cards.innerHTML='';
+  const b=document.createElement('div');b.className='opt';b.style.marginTop='4px';
+  b.innerHTML='<span class="mk">▶</span><span>放下报纸，继续评估</span>';
+  b.onclick=()=>{n.classList.remove('on');cards.style.display='none';cards.innerHTML='';renderMatrix(q);};
+  cards.appendChild(b);
+}
+
+/* ================= 选项 ================= */
+const valOf=c=>c.dataset.val||(opts._list?opts._list[+c.dataset.i]:'');
+const collect=()=>[...opts.children].filter(c=>c.classList.contains('sel')).map(valOf);
+function renderOpts(list,type){
+  opts._list=list;opts.innerHTML='';opts.style.display='block';
+  list.forEach((t,i)=>{const d=document.createElement('div');d.className='opt';d.dataset.i=i;
+    d.innerHTML='<span class="mk">'+'ABCDEFGHIJ'[i]+'</span><span>'+esc(t)+'</span>';
+    d.onclick=()=>onOpt(d,i,list,type);opts.appendChild(d);});
+}
+function needOk(){ok.classList.add('on');ok.onclick=()=>{
+  if(!sel.length){warn.textContent='请至少选一项';warn.classList.add('on');setTimeout(()=>warn.classList.remove('on'),1400);return;}
+  data_set();advanceQ();};}
+function onOpt(el,i,list,type){
+  if(clickLock)return;
+  if(/其他/.test(list[i])){const v=prompt('请填写「其他」内容（可留空）');if(v===null)return;
+    el.dataset.val=list[i].replace(/[：:].*$/,'')+'：'+(v||'');}
+  if(type==='s'){clickLock=true;[...opts.children].forEach(c=>c.classList.remove('sel'));
+    el.classList.add('sel');sel=[valOf(el)];burst(240,300,6,'#f0b429',2.2);
+    setTimeout(()=>{clickLock=false;data_set();advanceQ();},200);return;}
+  const lim=(type==='l3')?3:(type==='m'?99:2);
+  const mutualIdx=(type==='l2m')?list.length-2:-1;
+  if(i===mutualIdx){[...opts.children].forEach(c=>c.classList.remove('sel'));el.classList.add('sel');}
+  else{if(el.classList.contains('sel'))el.classList.remove('sel');
+    else{if(sel.length>=lim){warn.textContent='最多选 '+lim+' 项';warn.classList.add('on');setTimeout(()=>warn.classList.remove('on'),1400);return;}
+      el.classList.add('sel');}
+    if(mutualIdx>=0){const mi=opts.children[mutualIdx];if(mi&&mi!==el)mi.classList.remove('sel');}}
+  if(type==='l3'){const k=ord.indexOf(i);if(k>=0)ord.splice(k,1);else if(el.classList.contains('sel'))ord.push(i);
+    [...opts.children].forEach((c,j)=>{const o=c.querySelector('.ord');if(o)o.remove();const p=ord.indexOf(j);
+      if(p>=0){const s=document.createElement('span');s.className='ord';s.textContent='第'+(p+1);c.appendChild(s);}});
+    sel=ord.map(j=>valOf(opts.children[j]));}
+  else sel=collect();
+  needOk();
+}
+
+/* ================= 矩阵 ================= */
+function renderMatrix(q){
+  mxEl.style.display='block';mxEl.innerHTML='';
+  const head=document.createElement('div');head.className='mhead';
+  head.innerHTML='<span class="mlab">责任主体</span><span class="mcel">'+SCALE.map(s=>'<span>'+s+'</span>').join('')+'</span>';
+  mxEl.appendChild(head);
+  SUBJ.forEach((sub,r)=>{const row=document.createElement('div');row.className='mrow';
+    const lab=document.createElement('span');lab.className='mlab';lab.textContent=sub;
+    const cel=document.createElement('span');cel.className='mcel';
+    SCALE.forEach((sc,c)=>{const b=document.createElement('span');b.className='mbtn';b.textContent=sc.slice(0,2);b.title=sc;
+      b.onclick=()=>{[...cel.children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');mxRow[r]=c;
+        burst(240,300,5,'#f0b429',2);checkMatrix();};cel.appendChild(b);});
+    row.appendChild(lab);row.appendChild(cel);mxEl.appendChild(row);});
+  qtype.textContent='4 个主体均需作答';
+  checkMatrix();
+}
+function checkMatrix(){if(Object.keys(mxRow).length===4){ok.classList.add('on');ok.onclick=()=>{
+  R.answers[QN[curQ]]=SUBJ.map((_,i)=>mxRow[i]);R.rt[QN[curQ]]=Date.now()-t0;recordDone();advanceQ();};}}
+
+/* ================= Q11 填空分配 ================= */
+function renderAlloc(prev){
+  mxEl.style.display='block';mxEl.innerHTML='';
+  const head=document.createElement('div');head.className='mhead';
+  head.innerHTML='<span class="mlab">责任主体</span><span class="mcel" style="justify-content:flex-start">分数（0–100）</span>';
+  mxEl.appendChild(head);
+  const inputs=[];
+  SUBJ.forEach((sub,i)=>{const row=document.createElement('div');row.className='mrow';
+    row.innerHTML='<span class="mlab">'+sub+'</span><span class="mcel" style="justify-content:flex-start">'+
+      '<input class="ain" type="number" inputmode="numeric" min="0" max="100" value="'+(prev?prev[i]:'')+'">'+
+      '<span style="color:var(--ink-dim);font-size:10px">分</span></span>';
+    mxEl.appendChild(row);inputs.push(row.querySelector('.ain'));});
+  const sum=document.createElement('div');sum.className='asum';
+  sum.innerHTML='合计：<b id="asum">0</b> / 100';
+  mxEl.appendChild(sum);
+  const upd=()=>{let s=0;inputs.forEach(inp=>s+=(+inp.value||0));const el=$('#asum');el.textContent=s;
+    sum.classList.toggle('good',s===100);ok.disabled=(s!==100);if(s!==100)ok.classList.add('on');};
+  inputs.forEach(inp=>inp.addEventListener('input',upd));
+  ok.classList.add('on');ok.disabled=true;
+  ok.onclick=()=>{allocVals=inputs.map(inp=>Math.max(0,Math.min(100,+inp.value||0)));
+    if(allocVals.reduce((a,b)=>a+b,0)!==100){warn.textContent='合计须为 100';warn.classList.add('on');setTimeout(()=>warn.classList.remove('on'),1400);return;}
+    R.answers[QN[curQ]]=allocVals;R.rt[QN[curQ]]=Date.now()-t0;recordDone();advanceQ();};
+  qtype.textContent='合计必须为 100 分';
+  if(prev)upd();
+}
+
+/* ================= 记录 & 回退 ================= */
+function recordDone(){done.push({step:step,q:curQ});}
+function data_set(){R.answers[QN[curQ]]=(curQ==='q1'||QS[curQ].type==='s')?(sel[0]||''):sel.slice();
+  R.rt[QN[curQ]]=Date.now()-t0;if(curQ==='q1'&&sel[0]==='从未使用')R.skip_daily=true;recordDone();}
+function advanceQ(){
+  if(curQ==='q1'&&R.skip_daily){const idx=FLOW.findIndex(f=>f.skipIntro);step=idx-1;}
+  step++;run();
+}
+back.onclick=()=>{
+  if(!done.length)return;
+  const last=done.pop();
+  delete R.answers[QN[last.q]];delete R.rt[QN[last.q]];
+  if(last.q==='q1')R.skip_daily=false;
+  step=FLOW.findIndex(f=>f.q===last.q);
+  curQ=last.q;t0=Date.now();
+  clearUI();
+  back.classList.add('on');
+  renderQBack(last.q);
+};
+function renderQBack(qid){
+  const q=QS[qid];
+  if(q.type==='alloc'){renderAlloc();return;}
+  showText(q.ask);
+  if(q.type==='mx'){if(q.clue)showNews(q);else renderMatrix(q);qtype.textContent='4 个主体均需作答';return;}
+  if(q.type==='tx'){txin.classList.add('on');qtype.textContent='选填';ok.classList.add('on');
+    ok.onclick=()=>{R.answers[QN[qid]]=txin.value.trim();R.rt[QN[qid]]=Date.now()-t0;recordDone();advanceQ();};return;}
+  renderOpts(q.o,q.type);
+  qtype.textContent=q.type==='s'?'单选':(q.type==='l2'||q.type==='l2m'?'最多选 2 项':q.type==='l3'?'限选 3 项·按重要性点击':'多选');
+  back.classList.add('on');
+}
+
+/* ================= 主流程 ================= */
+function renderQ(qid){
+  const q=QS[qid];
+  if(q.type==='alloc'){renderAlloc();return;}
+  showText(q.ask);
+  if(q.type==='mx'){
+    if(q.clue){showNews(q);}
+    else renderMatrix(q);
+    qtype.textContent='4 个主体均需作答';return;
+  }
+  if(q.type==='tx'){txin.classList.add('on');qtype.textContent='选填';ok.classList.add('on');
+    ok.onclick=()=>{R.answers[QN[qid]]=txin.value.trim();R.rt[QN[qid]]=Date.now()-t0;recordDone();advanceQ();};return;}
+  renderOpts(q.o,q.type);
+  qtype.textContent=q.type==='s'?'单选':(q.type==='l2'||q.type==='l2m'?'最多选 2 项':q.type==='l3'?'限选 3 项·按重要性点击':'多选');
+}
+
+function run(){
+  clearUI();
+  if(step>=FLOW.length){finish();return;}
+  prog.style.width=Math.round(step/FLOW.length*100)+'%';
+  const f=FLOW[step];
+  if(f.s){
+    setScene(f.s,f);
+    if(f.card){showCards(f.card);showText('本场景涉及四个责任主体：');return;}
+    showText(esc(f.t).replace(/\n/g,'<br>'));
+    return;
+  }
+  if(f.q){curQ=f.q;t0=Date.now();back.classList.add('on');renderQ(f.q);return;}
+}
+
+function next(){
+  const f=FLOW[step];
+  if(!f||!f.s)return;
+  step++;
+  if(FLOW[step]&&FLOW[step].s&&FLOW[step].s!==f.s)showChapter(FLOW[step].s,()=>run());
+  else run();
+}
+stage.addEventListener('click',e=>{
+  if(card.classList.contains('on'))return;
+  if(e.target.closest('.opt')||e.target.closest('.mbtn')||e.target.closest('#ok')||
+     e.target.closest('#txin')||e.target.closest('.cb')||e.target.closest('.ain')||
+     e.target.closest('#back'))return;
+  const f=FLOW[step];if(f&&f.s)next();
+});
+addEventListener('keydown',e=>{if(e.key===' '||e.key==='Enter'){const f=FLOW[step];if(f&&f.s)next();}});
+
+/* ================= 幕间卡 ================= */
+const CH={room:['第一幕','日常使用'],car:['第二幕','事故现场'],stars:['第三幕','责任的追问'],archive:['第四幕','档案登记']};
+function showChapter(sc,cb){const c=CH[sc]||['',''];
+  card.innerHTML='<div class="ct">'+c[0]+'</div><div class="hr"></div>'+
+    '<div class="cs" style="color:var(--ink);font-size:13px">'+c[1]+'</div>';
+  card.classList.add('on');card.onclick=null;
+  setTimeout(()=>{card.onclick=()=>{card.classList.remove('on');card.onclick=null;cb();};},220);}
+
+/* ================= 收尾：责任画像 ================= */
+function finish(){
+  prog.style.width='100%';
+  const payload={sid:R.sid,version:R.version,startedAt:R.startedAt,finishedAt:Date.now(),
+    durationMs:Date.now()-R.startedAt,skip_daily:R.skip_daily,answers:R.answers,rt:R.rt,ua:navigator.userAgent};
+  try{localStorage.setItem('aisurvey_last',JSON.stringify(payload));}catch(e){}
+  setScene('archive');
+  const st=$('#stamp');st.style.transition='transform .18s ease-in';st.style.transformOrigin='433px 150px';
+  st.style.transform='translateY(-40px)';
+  setTimeout(()=>{st.style.transform='translateY(0) scale(1.06)';burst(433,150,18,'#f0b429',3.4);},180);
+  setTimeout(()=>{st.style.transform='translateY(0) scale(1)';},340);
+  setTimeout(()=>{portrait(payload);},900);
+}
+function portrait(payload){
+  const alloc=(payload.answers.q11_alloc&&payload.answers.q11_alloc.length===4)?payload.answers.q11_alloc:[25,25,25,25];
+  const topIdx=alloc.indexOf(Math.max.apply(null,alloc));
+  let bars='';SUBJ.forEach((n,i)=>{bars+=
+    '<div class="prow"><span class="plab">'+n+'</span><span class="pbar"><span class="pfill" style="width:'+alloc[i]+'%"></span></span>'+
+    '<span class="pval">'+alloc[i]+'分</span></div>';});
+  const hasApi=QS_CONFIG.api&&QS_CONFIG.api.length>0&&location.protocol!=='file:';
+  card.innerHTML='<div class="ct">你的责任画像</div><div class="hr"></div>'+
+    '<div id="portrait">'+bars+'</div>'+
+    '<div class="cs">在你看来，责任最重的是：<b style="color:var(--warm)">'+SUBJ[topIdx]+'</b><br>'+
+    '感谢你的参与，这份判断将被匿名用于研究。</div>'+
+    (hasApi?'<div class="cs" id="st">正在上传…</div>':'<div class="cs">数据已保存在本机</div>');
+  card.classList.add('on');card.onclick=null;
+  if(hasApi)submit(payload);
+}
+function exportFile(payload){const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(QS_CONFIG.exportName||'survey')+'_'+R.sid+'.json';
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+function submit(payload){const h={'Content-Type':'application/json'};if(QS_CONFIG.token)h['Authorization']='Bearer '+QS_CONFIG.token;
+  fetch(QS_CONFIG.api,{method:'POST',headers:h,body:JSON.stringify(payload)}).then(r=>{if(!r.ok)queue(payload);}).catch(()=>queue(payload));}
+function queue(payload){try{const q=JSON.parse(localStorage.getItem('aisurvey_queue')||'[]');q.push(payload);localStorage.setItem('aisurvey_queue',JSON.stringify(q));}catch(e){}}
+(function retry(){try{const api=QS_CONFIG.api;if(!api)return;const q=JSON.parse(localStorage.getItem('aisurvey_queue')||'[]');if(!q.length)return;
+  const h={'Content-Type':'application/json'};if(QS_CONFIG.token)h['Authorization']='Bearer '+QS_CONFIG.token;
+  const rest=[];Promise.all(q.map(p=>fetch(api,{method:'POST',headers:h,body:JSON.stringify(p)}).then(r=>{if(!r.ok)rest.push(p);}).catch(()=>rest.push(p))))
+    .then(()=>localStorage.setItem('aisurvey_queue',JSON.stringify(rest)));}catch(e){}})();
+
+/* ================= 启动 ================= */
+showChapter('room',run);
+</script>
+</body>
+</html>

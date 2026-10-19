@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>问卷后台看板</title>
+<style>
+:root{--bg:#12101a;--panel:#1c1826;--panel2:#252032;--line:#3a3350;--ink:#e8e2d4;--dim:#9a92a8;--gold:#f0b429;--ok:#7bc86c;--bad:#ef5350;--blue:#7fb2f0}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 "Microsoft YaHei","PingFang SC",sans-serif;padding:20px}
+h1{font-size:20px;margin:0 0 4px;color:var(--gold)}
+h2{font-size:15px;margin:26px 0 10px;color:var(--blue);border-left:3px solid var(--blue);padding-left:8px}
+.sub{color:var(--dim);font-size:12px;margin-bottom:18px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:8px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;text-align:center}
+.stat .n{font-size:26px;font-weight:700;color:var(--gold)}
+.stat .l{font-size:12px;color:var(--dim);margin-top:2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;margin-bottom:14px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--dim);font-weight:500;font-size:12px;white-space:nowrap}
+tr:hover td{background:var(--panel2)}
+.bar{height:10px;background:var(--panel2);border-radius:3px;overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#7fb2f0,#f0b429)}
+.pct{color:var(--dim);font-size:12px}
+.tag{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:1px 6px;font-size:12px;margin:1px 2px}
+details{margin:4px 0}
+summary{cursor:pointer;color:var(--blue);font-size:13px;padding:4px 0}
+summary:hover{color:var(--gold)}
+.ans{display:grid;grid-template-columns:150px 1fr;gap:2px 10px;font-size:12px;padding:6px 0 6px 14px}
+.ans .k{color:var(--dim)}
+.ans .v{color:var(--ink);word-break:break-all}
+.flash{background:#2a1a1a;border:1px solid var(--bad);color:var(--bad);padding:6px 10px;border-radius:4px;margin-bottom:12px}
+.btn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);padding:4px 12px;border-radius:4px;cursor:pointer;font-size:13px}
+.btn:hover{border-color:var(--gold);color:var(--gold)}
+.empty{color:var(--dim);text-align:center;padding:20px}
+.login{max-width:320px;margin:80px auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:24px}
+.login input{width:100%;padding:8px 10px;margin:10px 0;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:4px;font-size:15px}
+</style>
+</head>
+<body>
+
+<h1>AI 责任认知 · 问卷后台</h1>
+<div class="sub">金仓 survey schema · 自动刷新 <span id="up">—</span></div>
+
+{% if error %}<div class="flash">{{ error }}</div>{% endif %}
+
+<div style="margin-bottom:14px">
+  <button class="btn" onclick="location.reload()">立即刷新</button>
+  <button class="btn" id="auto" onclick="toggle()">自动刷新：开</button>
+  <a class="btn" href="/admin/logout" style="text-decoration:none">退出</a>
+</div>
+
+<!-- 概览 -->
+<div class="stats">
+  <div class="stat"><div class="n">{{ stat['n'] or 0 }}</div><div class="l">提交份数</div></div>
+  <div class="stat"><div class="n">{{ (stat['avg_ms'] or 0)|int // 1000 if (stat['avg_ms'] or 0) > 0 else '—' }}{% if (stat['avg_ms'] or 0) > 0 %}s{% endif %}</div><div class="l">平均时长</div></div>
+  <div class="stat"><div class="n">{{ stat['skip_n'] or 0 }}</div><div class="l">跳过日常部分</div></div>
+  <div class="stat"><div class="n">{{ rows|length }}</div><div class="l">明细条数</div></div>
+</div>
+
+<!-- Q11 责任配分 -->
+{% if alloc_avg %}
+<h2>Q11 责任配分 · 平均值（满分 100）</h2>
+<div class="card">
+  {% for s in subj %}
+  <div style="display:flex;align-items:center;gap:10px;margin:6px 0">
+    <div style="width:110px;color:var(--dim);font-size:13px">{{ s }}</div>
+    <div class="bar" style="flex:1"><i style="width:{{ alloc_avg[loop.index0] }}%"></i></div>
+    <div style="width:52px;text-align:right;color:var(--gold);font-weight:600">{{ alloc_avg[loop.index0] }} 分</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- 条件题均值 -->
+{% if matrix_avg %}
+<h2>条件题 · 各主体责任变化均值</h2>
+<div class="card">
+  <table>
+    <tr><th>条件</th>{% for s in subj %}<th>{{ s }}</th>{% endfor %}<th>n</th></tr>
+    {% for m in matrix_avg %}
+    <tr>
+      <td>{{ m['name'] }}</td>
+      {% for v in m['avg'] %}
+      <td><span class="tag" style="color:{% if v > 2 %}var(--gold){% elif v < 2 %}var(--ok){% else %}var(--dim){% endif %}">{{ v }}</span></td>
+      {% endfor %}
+      <td class="pct">{{ m['n'] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <div class="pct" style="margin-top:6px">档位：0=明显减轻 · 1=略有减轻 · 2=基本不变 · 3=略有加重 · 4=明显加重</div>
+</div>
+{% endif %}
+
+<!-- 每题分布 -->
+<h2>每题选项分布</h2>
+{% for d in dist %}
+<details class="card">
+  <summary>{{ d['name'] }} <span class="pct">（{{ d['total'] }} 份作答）</span></summary>
+  <table>
+    {% for it in d['items'] %}
+    <tr>
+      <td style="width:60%">{{ it['k'] }}</td>
+      <td style="width:12%;color:var(--gold);font-weight:600">{{ it['n'] }}</td>
+      <td style="width:20%"><div class="bar"><i style="width:{{ it['pct'] }}%"></i></div></td>
+      <td class="pct">{{ it['pct'] }}%</td>
+    </tr>
+    {% endfor %}
+  </table>
+</details>
+{% else %}
+<div class="card empty">还没有数据</div>
+{% endfor %}
+
+<!-- 被试明细 -->
+<h2>被试明细（点击展开看具体选项）</h2>
+{% if rows %}
+{% for r in rows %}
+<details class="card">
+  <summary>
+    #{{ r['id'] }} · {{ r['sid'] }}
+    <span class="pct">
+      {% if r['finished_at'] %}完成 {{ ((r['finished_at'] / 1000)|int) if r['finished_at'] else '' }} {% endif %}
+      {% if r['duration_ms'] %}用时 {{ (r['duration_ms'] // 1000) }}s{% endif %}
+      {% if r['skip_daily'] %} · <span style="color:var(--bad)">跳过日常</span>{% endif %}
+    </span>
+  </summary>
+  {% if r['answers'] %}
+  <div class="ans">
+    {% for code, val in r['answers'].items() %}
+    <div class="k">{{ qname.get(code, code) }}</div>
+    <div class="v">{{ val }}</div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">无作答</div>
+  {% endif %}
+</details>
+{% endfor %}
+{% else %}
+<div class="card empty">还没有提交</div>
+{% endif %}
+
+<script>
+let on = true, timer = null;
+function toggle(){
+  on = !on;
+  document.getElementById('auto').textContent = '自动刷新：' + (on ? '开' : '关');
+  if(on) start(); else clearInterval(timer);
+}
+function start(){ clearInterval(timer); timer = setInterval(()=>location.reload(), 5000); }
+start();
+document.getElementById('up').textContent = new Date().toLocaleTimeString();
+</script>
+</body>
+</html>
